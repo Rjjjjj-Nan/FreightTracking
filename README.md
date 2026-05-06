@@ -99,6 +99,38 @@ The main runtime files are `app.py`, `database_schema.sql`, `requirements.txt`, 
 - Helper setup scripts were removed from the working tree, so the README now reflects the current app-first workflow.
 - If MySQL cannot connect, verify the `.env` values and confirm the database exists before starting the app.
 
+## GitHub Deployment (Render)
+
+This repository now includes a GitHub Actions workflow at `.github/workflows/main.yml` that:
+- Runs CI checks on every push to `main`
+- Triggers deployment to Render after CI passes
+
+### 1. Create a Render Web Service
+Use this repository as the source in Render and configure:
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT`
+
+### 2. Add Render Environment Variables
+In Render dashboard, add your runtime variables:
+- `SECRET_KEY`
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `MAIL_SERVER`
+- `MAIL_PORT`
+- `MAIL_USE_TLS`
+- `MAIL_USERNAME`
+- `MAIL_PASSWORD`
+- `MAIL_DEFAULT_SENDER`
+
+### 3. Add GitHub Secret
+In GitHub repository settings, add:
+- Secret Name: `RENDER_DEPLOY_HOOK_URL`
+- Value: Render Deploy Hook URL from your Render service
+
+After this is set, each push to `main` will automatically trigger a fresh deployment.
+
 ## Testing Checklist
 
 - [ ] Database created and seeded with 2000 parcels
