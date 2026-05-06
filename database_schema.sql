@@ -119,19 +119,6 @@ CREATE TABLE analytics_snapshots (
     INDEX idx_date (snapshot_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- User Sessions
-CREATE TABLE user_sessions (
-    session_id VARCHAR(255) PRIMARY KEY,
-    user_id INT NOT NULL,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL DEFAULT NULL,
-    INDEX idx_user (user_id),
-    INDEX idx_expires (expires_at),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Messages (User-Courier communication)
 CREATE TABLE messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
