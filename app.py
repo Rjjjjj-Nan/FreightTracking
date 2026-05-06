@@ -9,7 +9,8 @@ import bcrypt
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
 
-load_dotenv()
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=dotenv_path, override=True)
 
 # Flask App Configuration
 app = Flask(__name__)
@@ -29,10 +30,13 @@ mail = Mail(app)
 mysql_config = {
     'host': os.getenv('DB_HOST', 'localhost'),
     'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', ''),
     'database': os.getenv('DB_NAME', 'freight_logistics'),
     'autocommit': True
 }
+
+db_password = os.getenv('DB_PASSWORD', '')
+if db_password:
+    mysql_config['password'] = db_password
 
 def get_db_connection():
     """Create a new database connection"""
@@ -547,11 +551,46 @@ def admin_dashboard():
             daily_trend = result.fetchall()
         cursor.close()
         
-        # Get courier performance
+        # Get courier performance with rating metrics.
+        # Use separate aggregates to avoid multiplying parcel rows by rating rows.
         cursor = conn.cursor(dictionary=True)
-        cursor.callproc('GetCourierPerformance')
-        for result in cursor.stored_results():
-            courier_performance = result.fetchall()
+        cursor.execute("""
+            SELECT
+                u.user_id,
+                u.full_name,
+                u.username,
+                COALESCE(pp.parcels_assigned, 0) AS parcels_assigned,
+                COALESCE(pp.delivered, 0) AS delivered,
+                CASE
+                    WHEN COALESCE(pp.parcels_assigned, 0) > 0
+                    THEN ROUND((pp.delivered / pp.parcels_assigned) * 100, 2)
+                    ELSE 0
+                END AS delivery_rate,
+                COALESCE(rr.avg_rating, 0) AS avg_rating,
+                COALESCE(rr.total_ratings, 0) AS total_ratings
+            FROM users u
+            LEFT JOIN (
+                SELECT
+                    pa.courier_id,
+                    COUNT(DISTINCT p.parcel_id) AS parcels_assigned,
+                    SUM(CASE WHEN p.status = 'delivered' THEN 1 ELSE 0 END) AS delivered
+                FROM parcel_assignments pa
+                INNER JOIN parcels p ON pa.parcel_id = p.parcel_id
+                WHERE p.is_deleted = FALSE
+                GROUP BY pa.courier_id
+            ) pp ON u.user_id = pp.courier_id
+            LEFT JOIN (
+                SELECT
+                    cr.courier_id,
+                    ROUND(AVG(cr.rating_stars), 2) AS avg_rating,
+                    COUNT(*) AS total_ratings
+                FROM courier_ratings cr
+                GROUP BY cr.courier_id
+            ) rr ON u.user_id = rr.courier_id
+            WHERE u.role = 'courier'
+            ORDER BY delivered DESC
+        """)
+        courier_performance = cursor.fetchall()
         cursor.close()
         
         # Get parcels by destination
