@@ -155,6 +155,41 @@ CREATE TABLE courier_ratings (
     FOREIGN KEY (courier_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Views for common application queries
+CREATE OR REPLACE VIEW vw_active_couriers AS
+SELECT
+    u.user_id,
+    u.username,
+    u.full_name,
+    u.email,
+    u.phone,
+    u.created_at
+FROM users u
+WHERE u.role = 'courier' AND u.is_active = TRUE;
+
+CREATE OR REPLACE VIEW vw_active_parcels AS
+SELECT
+    p.parcel_id,
+    p.tracking_number,
+    p.user_id,
+    p.sender_name,
+    p.receiver_name,
+    p.origin_city,
+    p.destination_city,
+    p.weight_kg,
+    p.cost_php,
+    p.shipping_method,
+    p.status,
+    p.created_at,
+    p.updated_at,
+    pa.courier_id,
+    u.full_name AS courier_name,
+    pa.assigned_at
+FROM parcels p
+LEFT JOIN parcel_assignments pa ON p.parcel_id = pa.parcel_id
+LEFT JOIN users u ON pa.courier_id = u.user_id
+WHERE p.is_deleted = FALSE;
+
 -- Stored Procedures
 
 -- Get parcels assigned to a specific courier
