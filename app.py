@@ -1,5 +1,7 @@
 import os
 import json
+import random
+import string
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
@@ -8,6 +10,8 @@ from mysql.connector import Error
 import bcrypt
 from dotenv import load_dotenv
 from flask_mail import Mail, Message
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path, override=True)
@@ -322,6 +326,105 @@ Freight & Logistics Team"""
     except Exception as e:
         print(f"⚠ Error sending confirmation email: {e}")
         return False
+
+# ==================== ANALYTICS SNAPSHOT SCHEDULER ====================
+
+def create_daily_snapshot():
+    """
+    Create daily analytics snapshot at midnight.
+    Aggregates all parcel data from the current day into analytics_snapshots table.
+    This provides historical data for reporting and improves dashboard performance.
+    """
+    conn = get_db_connection()
+    if not conn:
+        print("❌ Cannot create snapshot: Database connection failed")
+        return
+    
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Check if snapshot already exists for today
+        cursor.execute("""
+            SELECT snapshot_id FROM analytics_snapshots 
+            WHERE snapshot_date = CURDATE()
+        """)
+        existing = cursor.fetchone()
+        
+        if existing:
+            print(f"ℹ Snapshot already exists for today ({datetime.now().strftime('%Y-%m-%d')})")
+            return
+        
+        # Calculate all analytics for today
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_parcels,
+                SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
+                SUM(CASE WHEN status = 'in_transit' THEN 1 ELSE 0 END) as in_transit_count,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_count,
+                SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as returned_count,
+                COALESCE(SUM(cost_php), 0) as total_revenue_php,
+                ROUND(COALESCE(AVG(DATEDIFF(COALESCE(updated_at, NOW()), created_at)), 0), 2) as avg_delivery_time_days,
+                ROUND(COALESCE(AVG(cost_php), 0), 2) as avg_cost_php,
+                ROUND(
+                    CASE 
+                        WHEN COUNT(*) = 0 THEN 0
+                        ELSE (SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) / COUNT(*) * 100)
+                    END, 
+                2) as success_rate_percent
+            FROM parcels
+            WHERE DATE(created_at) = CURDATE()
+        """)
+        
+        stats = cursor.fetchone()
+        
+        # Insert snapshot record
+        cursor.execute("""
+            INSERT INTO analytics_snapshots (
+                snapshot_date, total_parcels, delivered_count, in_transit_count,
+                pending_count, cancelled_count, returned_count, total_revenue_php,
+                avg_delivery_time_days, avg_cost_php, success_rate_percent, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            datetime.now().date(),
+            stats['total_parcels'] or 0,
+            stats['delivered_count'] or 0,
+            stats['in_transit_count'] or 0,
+            stats['pending_count'] or 0,
+            stats['cancelled_count'] or 0,
+            stats['returned_count'] or 0,
+            stats['total_revenue_php'] or 0,
+            stats['avg_delivery_time_days'] or 0,
+            stats['avg_cost_php'] or 0,
+            stats['success_rate_percent'] or 0
+        ))
+        conn.commit()
+        
+        print(f"✓ Daily snapshot created for {datetime.now().strftime('%Y-%m-%d')}")
+        print(f"  Total Parcels: {stats['total_parcels']}")
+        print(f"  Delivered: {stats['delivered_count']} | In Transit: {stats['in_transit_count']} | Pending: {stats['pending_count']}")
+        print(f"  Revenue: ₱{stats['total_revenue_php']} | Success Rate: {stats['success_rate_percent']}%")
+        
+    except Error as e:
+        print(f"❌ Error creating snapshot: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+# Initialize Background Scheduler
+def init_scheduler():
+    """Initialize APScheduler to run analytics snapshot daily at midnight"""
+    scheduler = BackgroundScheduler()
+    # Schedule snapshot creation at 00:00 (midnight) every day
+    scheduler.add_job(
+        create_daily_snapshot,
+        CronTrigger(hour=0, minute=0),
+        id='daily_analytics_snapshot',
+        name='Daily Analytics Snapshot',
+        replace_existing=True
+    )
+    scheduler.start()
+    print("✓ Analytics scheduler initialized - Daily snapshot scheduled at 00:00 (midnight)")
 
 # ==================== ROUTES ====================
 
@@ -1913,4 +2016,16 @@ def server_error(error):
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
+    # Initialize analytics scheduler before starting app
+    init_scheduler()
+    
+    print("\n" + "="*60)
+    print("🚀 FREIGHT & LOGISTICS MANAGEMENT SYSTEM STARTING")
+    print("="*60)
+    print(f"📊 Analytics snapshots enabled - Daily snapshot at midnight")
+    print(f"📧 Email notifications configured")
+    print(f"🔐 Session-based authentication active")
+    print(f"📱 Available at http://0.0.0.0:5000")
+    print("="*60 + "\n")
+    
     app.run(debug=True, host='0.0.0.0', port=5000)

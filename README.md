@@ -4,13 +4,29 @@
 A Flask and MySQL freight logistics system with role-based access for admins, couriers, and customers. The app supports parcel tracking, courier management, dashboard analytics, and parcel condition history.
 
 ## Main Features
-- Admin dashboard for parcel and courier management
-- Courier dashboard for assigned deliveries and condition updates
-- Customer registration and login
-- Parcel CRUD operations and courier assignment
-- Analytics charts for parcel status, trends, and courier performance
-- Parcel condition tracking with audit logs
-- bcrypt password hashing and session-based authentication
+
+### Core Features
+- **Admin Dashboard** - Dashboard analytics, manage parcels and couriers
+- **Courier Dashboard** - View assigned deliveries and update parcel conditions
+- **Customer Portal** - Registration, login, book parcels, track shipments
+- **Parcel Management** - Full CRUD operations with courier assignment
+- **Analytics** - Charts for parcel status, trends, and courier performance
+- **Audit Logging** - Track all parcel conditions and system actions
+- **Security** - bcrypt password hashing and session-based authentication
+
+### Email Feature
+- **Booking Confirmations** - Automatic confirmation emails after parcel booking
+- **Email Details** - Tracking number, sender/receiver info, cost breakdown
+- **Configurable** - Supports Gmail, Outlook, Yahoo, SendGrid, AWS SES
+
+### Courier Management System
+- **Courier Ratings & Reviews** - Display 1-5 star ratings on admin dashboard
+- **Courier Performance Reports** - Leaderboard with delivery rates and metrics
+- **Ratings & Reviews Report** - Detailed customer feedback with filtering and sorting
+- **Courier Information Management** - Edit courier details and contact info
+- **Courier Status Control** - Activate/deactivate couriers with preserved data
+- **Detailed Courier Profiles** - View complete statistics, recent parcels, and reviews
+- **Real-time Search** - Filter couriers by name, email, or phone
 
 ## Tech Stack
 - Backend: Flask, Python
@@ -131,6 +147,32 @@ In GitHub repository settings, add:
 
 After this is set, each push to `main` will automatically trigger a fresh deployment.
 
+## Shipping Options & Pricing
+
+The system provides four shipping methods with transparent pricing:
+
+### Shipping Methods
+
+| Shipping Method | Base Cost | Weight Surcharge | Use Case |
+|---|---|---|---|
+| **Standard** | ₱100 | ₱10/kg | Regular deliveries, flexible timeline |
+| **Express** | ₱200 | ₱10/kg | Time-sensitive deliveries, 1-2 day delivery |
+| **Super** | ₱300 | ₱10/kg | Urgent deliveries, priority handling |
+| **International** | ₱500 | ₱10/kg | Cross-border shipments, customs handling |
+
+### Pricing Calculation
+- **Total Cost** = Base Cost + (Weight in kg × ₱10)
+- Example: 3kg Standard = ₱100 + (3 × ₱10) = ₱130
+
+### How to Book
+1. Log in as a customer
+2. Go to "Book a Parcel"
+3. Fill in sender/receiver details
+4. Select shipping method based on your needs
+5. Enter parcel weight (in kg)
+6. Cost is calculated automatically
+7. Confirm and receive booking confirmation email with tracking number
+
 ## Testing Checklist
 
 - [ ] Database created and seeded with 2000 parcels
@@ -172,6 +214,174 @@ ModuleNotFoundError: No module named 'flask'
 ERROR: No couriers found
 ```
 **Solution**: Ensure database schema is imported before running seed script.
+
+## Email Feature Configuration
+
+### Overview
+The application sends automatic booking confirmation emails when users book parcels. Each email includes the tracking number, parcel details, cost breakdown, and tracking link.
+
+### Setup Steps
+
+#### 1. Configure .env File
+Add these email configuration variables to your `.env` file:
+
+```env
+# Email Configuration (Gmail SMTP)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-specific-password
+MAIL_DEFAULT_SENDER=noreply@freight-logistics.com
+```
+
+#### 2. Gmail Setup (if using Gmail)
+1. Go to [Google Account Security](https://myaccount.google.com/security)
+2. Enable "2-Step Verification"
+3. Generate "App Password" for Mail
+4. Copy the 16-character app password
+5. Paste into `MAIL_PASSWORD` in `.env`
+
+#### 3. Alternative Email Providers
+- **Outlook/Hotmail**: `smtp-mail.outlook.com`, port `587`
+- **Yahoo Mail**: `smtp.mail.yahoo.com`, port `587` (requires app password)
+- **SendGrid**: Use SendGrid SMTP credentials
+- **AWS SES**: Use your AWS SES SMTP credentials
+
+#### 4. Test Email Feature
+1. Log in as a customer
+2. Navigate to "Book a Parcel"
+3. Fill in all parcel details and submit
+4. Check your email inbox (also check spam folder)
+5. You should receive a confirmation email with tracking number and details
+
+### Email Troubleshooting
+
+**Email Not Sending:**
+- Verify MAIL_USERNAME and MAIL_PASSWORD in .env
+- For Gmail, ensure you used App Password (not regular password)
+- Check Flask console for error messages
+- Ensure port 587 is not blocked by firewall
+
+**Email Goes to Spam:**
+- Add sender address to your contacts
+- Mark email as "Not Spam" in your email client
+
+## Courier Management System
+
+### Admin Dashboard Enhancements
+The admin dashboard now displays:
+- **Quick Action Buttons** - "Manage Couriers", "Performance", "Ratings"
+- **Courier Performance Table** - Shows ratings, delivery rates, and revenue
+- **Key Metrics** - View courier names, contact info, parcel counts, and star ratings
+
+### Courier Management Page (`/admin/couriers`)
+
+**Access**: Admin Dashboard → "Manage Couriers" button
+
+**Features:**
+- View all couriers with active/inactive status
+- Search couriers by name, email, or phone
+- Quick statistics cards:
+  - Total couriers count
+  - Active couriers count
+  - Inactive couriers count
+- View, Edit, Deactivate/Reactivate actions
+
+### Courier Details Page
+
+**Access**: Courier Management → Click eye icon (View)
+
+**View:**
+- Complete courier profile with member since date
+- Performance metrics:
+  - Total parcels assigned
+  - Successfully delivered count
+  - In transit and pending counts
+  - Delivery rate percentage
+- Customer satisfaction:
+  - Average star rating (1-5)
+  - Total customer reviews
+  - Average delivery time in days
+  - Total revenue generated
+- Last 20 parcels assigned to courier
+- Last 10 customer reviews with ratings
+
+### Edit Courier Information
+
+**Access**: Courier Detail → Edit button
+
+**Edit Fields:**
+- Full name
+- Email address
+- Phone number
+
+### Deactivate/Reactivate Couriers
+
+**Access**: Courier Management or Detail page → Lock/Unlock icons
+
+**Why Deactivate:**
+- Remove underperforming couriers temporarily
+- Suspend without deleting courier data
+- Preserve all historical information
+- Reactivate anytime to restore access
+
+**Effect of Deactivation:**
+- Courier cannot accept new parcel assignments
+- Cannot see assigned parcels
+- All data preserved for future reactivation
+
+### Performance Report (`/admin/reports/courier-performance`)
+
+**Access**: Admin Dashboard → "Performance" button
+
+**Displays:**
+- Courier performance leaderboard sorted by rating and delivery rate
+- Quick statistics:
+  - Total active couriers
+  - Average delivery rate across all couriers
+  - Average customer rating
+  - Total system revenue
+- Detailed performance table with:
+  - Rank/position
+  - Courier name and status
+  - Parcels assigned and delivered
+  - Delivery rate percentage (with progress bar)
+  - Average star rating and review count
+  - Average delivery time
+  - Total revenue generated
+- Top performers sections:
+  - Top 3 highest rated couriers
+  - Top 3 highest delivery rate couriers
+  - Top 3 revenue earning couriers
+
+### Ratings & Reviews Report (`/admin/reports/courier-ratings`)
+
+**Access**: Admin Dashboard → "Ratings" button
+
+**Filter Options:**
+- By specific courier
+- By minimum star rating (1-5 stars)
+
+**Sort Options:**
+- Newest first (default)
+- Oldest first
+- Highest rating
+- Lowest rating
+
+**View:**
+- Full customer reviews with ratings
+- Courier name and customer name
+- Star rating (visual display)
+- Review date and time
+- Related parcel tracking number
+- Sender and receiver information
+
+**Summary Statistics:**
+- Total ratings received
+- Average rating across results
+- Count of 5-star reviews
+- Count of 1-2 star reviews
 
 ## Future Enhancements
 
